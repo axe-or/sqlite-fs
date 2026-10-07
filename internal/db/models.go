@@ -8,7 +8,7 @@ import (
 	"database/sql"
 )
 
-type Node struct {
+type FsNode struct {
 	ID         int64
 	ParentID   sql.NullInt64
 	Name       string

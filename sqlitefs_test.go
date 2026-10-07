@@ -68,7 +68,7 @@ func wantErr(t *testing.T, err, target error) {
 func countNodes(t *testing.T, sqlDB *sql.DB) int {
 	t.Helper()
 	var n int
-	must(t, sqlDB.QueryRow("SELECT count(*) FROM nodes").Scan(&n))
+	must(t, sqlDB.QueryRow("SELECT count(*) FROM fs_node").Scan(&n))
 	return n
 }
 

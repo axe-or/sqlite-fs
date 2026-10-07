@@ -8,9 +8,9 @@ const deleteSubtree = `
 WITH RECURSIVE sub(id) AS (
 	SELECT CAST(? AS INTEGER)
 	UNION ALL
-	SELECT n.id FROM nodes n JOIN sub ON n.parent_id = sub.id
+	SELECT n.id FROM fs_node n JOIN sub ON n.parent_id = sub.id
 )
-DELETE FROM nodes WHERE id IN (SELECT id FROM sub)
+DELETE FROM fs_node WHERE id IN (SELECT id FROM sub)
 `
 
 // DeleteSubtree deletes rootID and every node below it.

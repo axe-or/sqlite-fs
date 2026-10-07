@@ -11,7 +11,7 @@ import (
 )
 
 const deleteNode = `-- name: DeleteNode :exec
-DELETE FROM nodes WHERE id = ?
+DELETE FROM fs_node WHERE id = ?
 `
 
 func (q *Queries) DeleteNode(ctx context.Context, id int64) error {
@@ -20,7 +20,7 @@ func (q *Queries) DeleteNode(ctx context.Context, id int64) error {
 }
 
 const getChild = `-- name: GetChild :one
-SELECT id, kind FROM nodes WHERE parent_id = ? AND name = ?
+SELECT id, kind FROM fs_node WHERE parent_id = ? AND name = ?
 `
 
 type GetChildParams struct {
@@ -41,7 +41,7 @@ func (q *Queries) GetChild(ctx context.Context, arg GetChildParams) (GetChildRow
 }
 
 const getData = `-- name: GetData :one
-SELECT data FROM nodes WHERE id = ?
+SELECT data FROM fs_node WHERE id = ?
 `
 
 func (q *Queries) GetData(ctx context.Context, id int64) ([]byte, error) {
@@ -52,7 +52,7 @@ func (q *Queries) GetData(ctx context.Context, id int64) ([]byte, error) {
 }
 
 const hasChildren = `-- name: HasChildren :one
-SELECT EXISTS (SELECT 1 FROM nodes WHERE parent_id = ?)
+SELECT EXISTS (SELECT 1 FROM fs_node WHERE parent_id = ?)
 `
 
 func (q *Queries) HasChildren(ctx context.Context, parentID sql.NullInt64) (bool, error) {
@@ -64,7 +64,7 @@ func (q *Queries) HasChildren(ctx context.Context, parentID sql.NullInt64) (bool
 
 const insertDir = `-- name: InsertDir :execlastid
 
-INSERT INTO nodes (parent_id, name, kind, created_at, modified_at, data)
+INSERT INTO fs_node (parent_id, name, kind, created_at, modified_at, data)
 VALUES (?, ?, 0, ?, ?, NULL)
 `
 
@@ -91,7 +91,7 @@ func (q *Queries) InsertDir(ctx context.Context, arg InsertDirParams) (int64, er
 }
 
 const insertFile = `-- name: InsertFile :execlastid
-INSERT INTO nodes (parent_id, name, kind, created_at, modified_at, data)
+INSERT INTO fs_node (parent_id, name, kind, created_at, modified_at, data)
 VALUES (?, ?, 1, ?, ?, ?)
 `
 
@@ -118,7 +118,7 @@ func (q *Queries) InsertFile(ctx context.Context, arg InsertFileParams) (int64, 
 }
 
 const insertRoot = `-- name: InsertRoot :exec
-INSERT OR IGNORE INTO nodes (id, parent_id, name, kind, created_at, modified_at)
+INSERT OR IGNORE INTO fs_node (id, parent_id, name, kind, created_at, modified_at)
 VALUES (1, NULL, '', 0, ?, ?)
 `
 
@@ -136,7 +136,7 @@ const isAncestor = `-- name: IsAncestor :one
 WITH RECURSIVE anc(id) AS (
 	SELECT CAST(?2 AS INTEGER)
 	UNION ALL
-	SELECT n.parent_id FROM nodes n JOIN anc ON n.id = anc.id WHERE n.parent_id IS NOT NULL
+	SELECT n.parent_id FROM fs_node n JOIN anc ON n.id = anc.id WHERE n.parent_id IS NOT NULL
 )
 SELECT COUNT(*) FROM anc WHERE id = ?1
 `
@@ -156,7 +156,7 @@ func (q *Queries) IsAncestor(ctx context.Context, arg IsAncestorParams) (int64, 
 
 const listChildren = `-- name: ListChildren :many
 SELECT name, kind, CAST(COALESCE(length(data), 0) AS INTEGER) AS size, created_at, modified_at
-FROM nodes WHERE parent_id = ? ORDER BY name
+FROM fs_node WHERE parent_id = ? ORDER BY name
 `
 
 type ListChildrenRow struct {
@@ -196,8 +196,57 @@ func (q *Queries) ListChildren(ctx context.Context, parentID sql.NullInt64) ([]L
 	return items, nil
 }
 
+const listChildrenAfter = `-- name: ListChildrenAfter :many
+SELECT name, kind, CAST(COALESCE(length(data), 0) AS INTEGER) AS size, created_at, modified_at
+FROM fs_node WHERE parent_id = ? AND name > ? ORDER BY name LIMIT ?
+`
+
+type ListChildrenAfterParams struct {
+	ParentID sql.NullInt64
+	Name     string
+	Limit    int64
+}
+
+type ListChildrenAfterRow struct {
+	Name       string
+	Kind       int64
+	Size       int64
+	CreatedAt  int64
+	ModifiedAt int64
+}
+
+// Keyset pagination for Entries: the page of children sorted after name.
+func (q *Queries) ListChildrenAfter(ctx context.Context, arg ListChildrenAfterParams) ([]ListChildrenAfterRow, error) {
+	rows, err := q.db.QueryContext(ctx, listChildrenAfter, arg.ParentID, arg.Name, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListChildrenAfterRow
+	for rows.Next() {
+		var i ListChildrenAfterRow
+		if err := rows.Scan(
+			&i.Name,
+			&i.Kind,
+			&i.Size,
+			&i.CreatedAt,
+			&i.ModifiedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const moveNode = `-- name: MoveNode :exec
-UPDATE nodes SET parent_id = ?, name = ? WHERE id = ?
+UPDATE fs_node SET parent_id = ?, name = ? WHERE id = ?
 `
 
 type MoveNodeParams struct {
@@ -213,7 +262,7 @@ func (q *Queries) MoveNode(ctx context.Context, arg MoveNodeParams) error {
 
 const statNode = `-- name: StatNode :one
 SELECT name, kind, CAST(COALESCE(length(data), 0) AS INTEGER) AS size, created_at, modified_at
-FROM nodes WHERE id = ?
+FROM fs_node WHERE id = ?
 `
 
 type StatNodeRow struct {
@@ -238,7 +287,7 @@ func (q *Queries) StatNode(ctx context.Context, id int64) (StatNodeRow, error) {
 }
 
 const touch = `-- name: Touch :exec
-UPDATE nodes SET modified_at = ? WHERE id = ?
+UPDATE fs_node SET modified_at = ? WHERE id = ?
 `
 
 type TouchParams struct {
@@ -252,7 +301,7 @@ func (q *Queries) Touch(ctx context.Context, arg TouchParams) error {
 }
 
 const updateData = `-- name: UpdateData :exec
-UPDATE nodes SET data = ?, modified_at = ? WHERE id = ?
+UPDATE fs_node SET data = ?, modified_at = ? WHERE id = ?
 `
 
 type UpdateDataParams struct {

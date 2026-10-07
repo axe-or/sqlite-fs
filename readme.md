@@ -41,6 +41,8 @@ Stat(ctx, "/path/to/something") // Name, Kind, Size, CreatedAt, ModifiedAt (impl
 
 ReadDir(ctx, "/path/to/dir") // Lists a directory, sorted by name
 
+Entries(ctx, "/path/to/dir") // iter.Seq2[*FileInfo, error] over a directory, sorted by name, fetched in pages
+
 IOFS(ctx) // Read-only io/fs view (fs.FS, ReadFileFS, ReadDirFS, StatFS)
 ```
 

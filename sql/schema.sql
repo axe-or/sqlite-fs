@@ -3,9 +3,9 @@
 
 -- A single adjacency-list table holds both files and directories.
 -- Node 1 is the root directory and is the only node without a parent.
-CREATE TABLE IF NOT EXISTS nodes (
+CREATE TABLE IF NOT EXISTS fs_node (
 	id          INTEGER PRIMARY KEY,
-	parent_id   INTEGER REFERENCES nodes(id),
+	parent_id   INTEGER REFERENCES fs_node(id),
 	name        TEXT    NOT NULL,
 	kind        INTEGER NOT NULL, -- 0 = dir, 1 = file
 	created_at  INTEGER NOT NULL, -- unix nanoseconds
@@ -16,4 +16,4 @@ CREATE TABLE IF NOT EXISTS nodes (
 	UNIQUE (parent_id, name)
 );
 
-CREATE INDEX IF NOT EXISTS nodes_parent ON nodes(parent_id);
+CREATE INDEX IF NOT EXISTS fs_node_parent ON fs_node(parent_id);
