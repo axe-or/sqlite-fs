@@ -19,12 +19,12 @@ import (
 )
 
 // openDB opens file with the FTS5 extension registered on every connection.
-func openDB(t *testing.T, file string) *sql.DB {
+func openDB(t testing.TB, file string) *sql.DB {
 	t.Helper()
 	return openDBWith(t, file, fts5.Register)
 }
 
-func openDBWith(t *testing.T, file string, init ...func(*sqlite3.Conn) error) *sql.DB {
+func openDBWith(t testing.TB, file string, init ...func(*sqlite3.Conn) error) *sql.DB {
 	t.Helper()
 	dsn := "file:" + filepath.ToSlash(file) + "?_pragma=busy_timeout(10000)&_txlock=immediate"
 	sqlDB, err := driver.Open(dsn, init...)
@@ -37,7 +37,7 @@ func openDBWith(t *testing.T, file string, init ...func(*sqlite3.Conn) error) *s
 
 // newFS returns an FS on a fresh database whose clock advances one second
 // per call, starting at the unix epoch.
-func newFS(t *testing.T) (*FS, *sql.DB) {
+func newFS(t testing.TB) (*FS, *sql.DB) {
 	t.Helper()
 	sqlDB := openDB(t, filepath.Join(t.TempDir(), "fs.db"))
 	f, err := New(t.Context(), sqlDB)
@@ -55,7 +55,7 @@ func newFS(t *testing.T) (*FS, *sql.DB) {
 	return f, sqlDB
 }
 
-func must(t *testing.T, err error) {
+func must(t testing.TB, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatal(err)
@@ -73,7 +73,7 @@ func wantErr(t *testing.T, err, target error) {
 	}
 }
 
-func countNodes(t *testing.T, sqlDB *sql.DB) int {
+func countNodes(t testing.TB, sqlDB *sql.DB) int {
 	t.Helper()
 	var n int
 	must(t, sqlDB.QueryRow("SELECT count(*) FROM fs_node").Scan(&n))
