@@ -70,7 +70,7 @@ All errors are `*fs.PathError` and can be checked with `errors.Is`:
 
 # Explicitly out of scope
 
-- Symlinks are strictly disallowed, the file system is acyclical graph, parent pointers are fine as implementatino detail
+- Symlinks are strictly disallowed, the file system is acyclical graph
 - UNIX permissions, this filesystem is only for files and directories, no pipes, symlinks, hardlinks, etc.
 
 # Potentially in-scope for a v2
@@ -81,7 +81,7 @@ All errors are `*fs.PathError` and can be checked with `errors.Is`:
 
 _zero_ runtime dependencies. This library is literally just SQL + Logic
 
-For testing and developing, sqlc and ncruces sqlite driver shall be used.
+For testing and developing, sqlc and ncruces sqlite driver are used
 
 ```
 go generate ./...   # sqlc generate: sqlc.json -> internal/db
