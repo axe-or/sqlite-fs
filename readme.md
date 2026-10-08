@@ -2,19 +2,24 @@ SQLite backed filesystem.
 
 # Usage
 
-Open the database with whichever SQLite driver you prefer and hand the `*sql.DB` over:
+Open the database with whichever SQLite driver you prefer and hand the `*sql.DB` over. The driver must provide FTS5 with the trigram tokenizer (SQLite 3.34+), which name search uses. `New` returns `sqlitefs.ErrNoFTS5` otherwise.
 
 ```go
 import (
-	"database/sql"
-
 	sqlitefs "github.com/axe-or/sqlite-fs"
-	_ "github.com/ncruces/go-sqlite3/driver" // or any other SQLite driver
+	"github.com/ncruces/go-sqlite3/driver"
+	"github.com/ncruces/go-sqlite3/ext/fts5"
 )
 
-db, err := sql.Open("sqlite3", "file:myfs.db?_pragma=busy_timeout(5000)&_txlock=immediate")
+db, err := driver.Open("file:myfs.db?_pragma=busy_timeout(5000)&_txlock=immediate", fts5.Register)
 fsys, err := sqlitefs.New(ctx, db)
 ```
+
+| Driver | Enabling FTS5 |
+|---|---|
+| `github.com/ncruces/go-sqlite3` | `driver.Open(dsn, fts5.Register)` |
+| `github.com/mattn/go-sqlite3` | build with `-tags sqlite_fts5` |
+| `modernc.org/sqlite` | built in |
 
 For concurrent writers, set a busy timeout and, if your driver supports it, immediate transactions (as above). Otherwise lock upgrades may fail with `SQLITE_BUSY`.
 
@@ -43,6 +48,8 @@ ReadDir(ctx, "/path/to/dir") // Lists a directory, sorted by name
 
 Entries(ctx, "/path/to/dir") // iter.Seq2[*FileInfo, error] over a directory, sorted by name, fetched in pages
 
+Search(ctx, "report", "/path/to/dir") // iter.Seq2[SearchResult, error] of names containing "report" (case-insensitive) below the dir, ranked exact > prefix > substring, then shorter names
+
 IOFS(ctx) // Read-only io/fs view (fs.FS, ReadFileFS, ReadDirFS, StatFS)
 ```
 
@@ -59,6 +66,7 @@ All errors are `*fs.PathError` and can be checked with `errors.Is`:
 | `sqlitefs.ErrIsDir`    | a file was expected (`ReadFile`, `WriteFile`, `RemoveFile` on a directory)            |
 | `sqlitefs.ErrNotEmpty` | non-recursive `RemoveDir` on a non-empty directory                                    |
 | `sqlitefs.ErrCycle`    | `Move` of a directory into its own subtree                                            |
+| `sqlitefs.ErrNoFTS5`   | returned by `New` when the driver lacks FTS5 or the trigram tokenizer                 |
 
 # Explicitly out of scope
 

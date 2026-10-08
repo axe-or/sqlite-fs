@@ -37,6 +37,9 @@ type FS struct {
 
 // New returns an FS stored in db, creating its tables if needed.
 //
+// The driver must provide FTS5 with the trigram tokenizer, which name search
+// relies on; New returns ErrNoFTS5 otherwise.
+//
 // For concurrent writers, configure the connection with a busy timeout and,
 // where the driver allows it, immediate transactions (e.g. ncruces:
 // "file:x.db?_pragma=busy_timeout(5000)&_txlock=immediate").
@@ -49,18 +52,16 @@ func New(ctx context.Context, sqlDB *sql.DB) (*FS, error) {
 		}
 		switch version {
 		case schemaVersion:
-			return nil
+			// Every connection that writes needs FTS5 for the index triggers,
+			// so check it on existing databases too.
+			_, err := tx.ExecContext(ctx, "SELECT rowid FROM fs_node_name LIMIT 0")
+			return checkFTS5(err)
 		case 0:
 		default:
 			return fmt.Errorf("sqlitefs: unsupported schema version %d", version)
 		}
-		for _, stmt := range strings.Split(schemaSQL, ";") {
-			if strings.TrimSpace(stmt) == "" {
-				continue
-			}
-			if _, err := tx.ExecContext(ctx, stmt); err != nil {
-				return err
-			}
+		if _, err := tx.ExecContext(ctx, schemaSQL); err != nil {
+			return checkFTS5(err)
 		}
 		now := f.now().UnixNano()
 		if err := q.InsertRoot(ctx, db.InsertRootParams{CreatedAt: now, ModifiedAt: now}); err != nil {
@@ -73,6 +74,19 @@ func New(ctx context.Context, sqlDB *sql.DB) (*FS, error) {
 		return nil, fmt.Errorf("sqlitefs: init: %w", err)
 	}
 	return f, nil
+}
+
+// checkFTS5 reports a missing FTS5 module or trigram tokenizer as ErrNoFTS5.
+// SQLite's error text is the only signal drivers have in common.
+func checkFTS5(err error) error {
+	if err == nil {
+		return nil
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "no such module: fts5") || strings.Contains(msg, "no such tokenizer: trigram") {
+		return fmt.Errorf("%w (%v)", ErrNoFTS5, err)
+	}
+	return err
 }
 
 func (f *FS) tx(ctx context.Context, fn func(tx *sql.Tx, q *db.Queries) error) error {

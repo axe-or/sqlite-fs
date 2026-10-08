@@ -17,3 +17,7 @@ type FsNode struct {
 	ModifiedAt int64
 	Data       []byte
 }
+
+type FsNodeName struct {
+	Name string
+}

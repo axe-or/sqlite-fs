@@ -13,13 +13,21 @@ import (
 	"testing/fstest"
 	"time"
 
-	_ "github.com/ncruces/go-sqlite3/driver"
+	"github.com/ncruces/go-sqlite3"
+	"github.com/ncruces/go-sqlite3/driver"
+	"github.com/ncruces/go-sqlite3/ext/fts5"
 )
 
+// openDB opens file with the FTS5 extension registered on every connection.
 func openDB(t *testing.T, file string) *sql.DB {
 	t.Helper()
+	return openDBWith(t, file, fts5.Register)
+}
+
+func openDBWith(t *testing.T, file string, init ...func(*sqlite3.Conn) error) *sql.DB {
+	t.Helper()
 	dsn := "file:" + filepath.ToSlash(file) + "?_pragma=busy_timeout(10000)&_txlock=immediate"
-	sqlDB, err := sql.Open("sqlite3", dsn)
+	sqlDB, err := driver.Open(dsn, init...)
 	if err != nil {
 		t.Fatal(err)
 	}
